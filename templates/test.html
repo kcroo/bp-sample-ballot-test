@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block head %}
+{% endblock %}
+
+{% block body %}
+<script src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js"
+    integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew=="
+    crossorigin="">
+</script>
+
+<div class="container">
+    <div id="mapid">
+    </div>
+</div>
+
+<script>
+    // format district boundary as GeoJSON to map with Leaflet
+    // safe keyword in jinja means that characters are not automatically HTML escaped
+    const districtGeoJSON = { 
+        "type": "Feature",
+        "properties": {},
+        "geometry": {{ results['district_boundary'] | safe }}
+    };
+
+    // make map, add district boundary, and zoom to district bounds
+    const map = L.map('mapid');
+    const districtBoundary = new L.GeoJSON(districtGeoJSON);
+    districtBoundary.addTo(map);
+    map.fitBounds(districtBoundary.getBounds());
+
+    // for each random point, convert to Leaflet latlong object and add marker to map
+    // note that coordinate pair is (longitude, latitude in results['random_points'], but Leaflet needs (latitude, longitude)
+    const randomPoints = {{ results['random_points'] | safe }};
+
+    randomPoints.forEach(point => {
+        const latLong = L.latLng(point[1], point[0]);
+        const layer = L.marker(latLong).addTo(map);
+    });
+
+</script>
+
+<br>
+    <div class="row">
+        <div class="col-sm">
+            <a class="btn btn-primary" href="/" role="button">New Test</a>
+        </div>
+        <div class="col-sm">
+            <a class="btn btn-primary" href={{ ['/?district_id=', results['district_id'], '&election_date=', results['election_date'], '&number_of_points=', results['number_of_points']]|join }} role="button">Rerun Test</a>
+        </div>
+    </div>
+
+{% endblock %}

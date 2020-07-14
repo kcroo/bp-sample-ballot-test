@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block head %}
+{% endblock %}
+
+{% block body %}
+<div class="container">
+    <form action="/" method="post">
+        {{ form.hidden_tag() }}
+        <fieldset>
+            <legend>{{ legend }}</legend>
+            <div class="form-group required">
+                {{ form.district_id.label(class="form-control-label") }}
+
+                {% if form.district_id.errors %}
+                    {{ form.district_id(class="form-control is-invalid") }}
+                    <div class="invalid-feedback">
+                        {% for error in form.district_id.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    {{ form.district_id(class="form-control") }}
+                {% endif %}
+            </div>
+            <div class="form-group">
+                {{ form.election_date.label(class="form-control-label") }}
+                {% if form.election_date.errors %}
+                    {{ form.election_date(class="form-control is-invalid") }}
+                    <div class="invalid-feedback">
+                        {% for error in form.election_date.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    {{ form.election_date(class="form-control") }}
+                {% endif %}
+            </div>
+            <div class="form-group">
+                {{ form.number_of_points.label(class="form-control-label") }}
+
+                {% if form.number_of_points.errors %}
+                    {{ form.number_of_points(class="form-control is-invalid") }}
+                    <div class="invalid-feedback">
+                        {% for error in form.number_of_points.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    {{ form.number_of_points(class="form-control") }}
+                {% endif %}
+            </div>
+            <br>
+            <div class="form-group">
+                {{ form.submit(class="form-control") }}
+            </div>
+        </fieldset>
+    </form>
+</div>
+{% endblock %}

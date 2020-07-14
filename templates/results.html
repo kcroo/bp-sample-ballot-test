@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block head %}
+<script src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js"
+    integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew=="
+    crossorigin="">
+</script>
+{% endblock %}
+
+{% block body %}
+<div class="container">
+    {% if results['error'] %}
+        <h3>Error - {{ results['error'] }}</h3>
+    {% else %}
+        <h3>Results for District ID {{ results['district_id'] }}</h3>
+        <table class="table table-striped table-bordered">
+            <tr>
+                <th scope="col">In Results</th>
+                <th scope="col">Not In Results</th>
+                <th scope="col">Has Candidates</th>
+                <th scope="col">Has No Candidates</th>
+                <th scope="col">Error</th>
+            </tr>
+            <tr>
+                <td>
+                    <ul>
+                        {% for item in results['in_results'] %}
+                            <li>{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                </td>
+
+                <td>
+                    <ul>
+                        {% for item in results['not_in_results'] %}
+                            <li>{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                </td>
+
+                <td>
+                    <ul>
+                        {% for item in results['has_candidates'] %}
+                            <li>{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                </td>
+
+                <td>
+                    <ul>
+                        {% for item in results['no_candidates'] %}
+                            <li>{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                </td>     
+
+                <td>
+                    <ul>
+                        {% for item in results['no_election_button'] %}
+                            <li>{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                </td>   
+            </tr>
+        </table>
+
+        <br>
+        <br>
+        <div id="mapid">
+        </div>
+
+        <script>
+            console.log({{ results | safe }});
+            // format district boundary as GeoJSON to map with Leaflet
+            // safe keyword in jinja means that characters are not automatically HTML escaped
+            const districtGeoJSON = { 
+                "type": "Feature",
+                "properties": {},
+                "geometry": {{ results['district_boundary'] | safe }}
+            };
+        
+            // make map, add district boundary, and zoom to district bounds
+            const map = L.map('mapid');
+            const districtBoundary = new L.GeoJSON(districtGeoJSON);
+            districtBoundary.addTo(map);
+            map.fitBounds(districtBoundary.getBounds());
+
+            // for each random point, convert to Leaflet latlong object and add marker to map
+            // note that coordinate pair is (longitude, latitude in results['random_points'], but Leaflet needs (latitude, longitude)
+            const pointsInResults = {{ results['in_results'] | safe }};
+            pointsInResults.forEach(point => {
+                const latLong = L.latLng(point);
+                const circle = L.circle(latLong, {
+                    color: 'green',
+                    fillColor: '#14F741',
+                    fillOpacity: 0.5,
+                    radius: 250
+                }).addTo(map);
+            });
+
+            const pointsNotInResults = {{ results['not_in_results'] | safe }};
+            pointsNotInResults.forEach(point => {
+                const latLong = L.latLng(point);
+                const circle = L.circle(latLong, {
+                    color: 'red',
+                    fillColor: '#f03',
+                    fillOpacity: 0.5,
+                    radius: 250
+                }).addTo(map);
+            });
+
+            // add open street map basemap
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+        
+        </script>
+    {% endif %}
+
+    <br>
+    <div class="row">
+        <div class="col-sm">
+            <a class="btn btn-primary" href="/" role="button">New Test</a>
+        </div>
+        <div class="col-sm">
+            <a class="btn btn-primary" href={{ ['/?district_id=', results['district_id'], '&election_date=', results['election_date'], '&number_of_points=', results['number_of_points']]|join }} role="button">Rerun Test</a>
+        </div>
+    </div>
+    
+</div>
+{% endblock %}
