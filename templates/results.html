@@ -64,6 +64,11 @@
             </tr>
         </table>
 
+        <h4>Links</h4>
+            {% for item in results['links'] %}
+                <a href="{{ item }}" target="_blank">{{ item }}</a>
+            {% endfor %}
+
         <br>
         <br>
         <div id="mapid">
