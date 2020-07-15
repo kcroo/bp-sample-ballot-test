@@ -33,88 +33,110 @@ class SampleBallotThread (threading.Thread):
         
 
     def run(self):
-        latitude = self.coords[1]
-        longitude = self.coords[0]
-
+        # one try-except-finally block for entire test to make sure webdriver is closed -> prevents memory leak
         try:
-            self.driver.get(self.URL)
+            # coordinates from PostGIS are tuple: (longitude, latitude)
+            latitude = self.coords[1]
+            longitude = self.coords[0]
 
-            ### input address
-            addressInput = self.driver.find_element_by_id('bp-sbl-address-input')
-            addressInput.clear()
-            addressInput.send_keys(f'{latitude} {longitude}', Keys.RETURN)
-
-            ### select election date (if no dates, will proceed to sample ballot)
-            if self.election_date != None:
-                electionButton = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, f'//input[@value="{self.election_date}"]'))
-                )
-                electionButton.click()
-            else:
-                electionButton = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.NAME, 'election'))
-                )
-                electionButton.click()
-            
             # set wait time for ALL subsequent find operations with selenium
             self.driver.implicitly_wait(5)
+            self.driver.get(self.URL)
             
-            # find continue button and click it -> brings it to sample ballot results
-            continueButton = self.driver.find_element_by_class_name('bp-sbl-choose-continue')
-            continueButton.click()
+            ### input address
+            try:
+                addressInput = self.driver.find_element_by_id('bp-sbl-address-input')
+                addressInput.clear()
+                addressInput.send_keys(f'{latitude} {longitude}', Keys.RETURN)
+            except Exception as e:
+                print(f'address exception: {str(e)}')
+
+            ### election date: catch and ignore ElementNotInteractableException, which happens if no election date list
+            try:
+                # if user provided an election date, choose it from the list
+                if self.election_date != None:
+                    electionButton = WebDriverWait(self.driver, 10).until(
+                    EC.presence_of_element_located((By.XPATH, f'//input[@value="{self.election_date}"]'))
+                    )
+                    electionButton.click()
+                # user didn't provide election date -> choose first in list
+                else:
+                    electionButton = WebDriverWait(self.driver, 10).until(
+                    EC.presence_of_element_located((By.NAME, 'election'))
+                    )
+                    electionButton.click()
+
+                # find continue button and click it -> brings it to sample ballot results
+                continueButton = self.driver.find_element_by_class_name('bp-sbl-choose-continue')
+                continueButton.click()
+
+            # occurs if page takes too long to load -> end test
+            except (TimeoutException, NoSuchElementException):
+                print(f'Election button exception: {str(e)}')
+                self.results['errors'].append([latitude, longitude])
+			
+			# ignore this exception! occurs if no election list, because there's only one upcoming election -> keep going with test
+            except ElementNotInteractableException:
+                print('ignoring element not interactable for election date')
+                pass
+
+            
 
             ### sample ballot results
-            # get text of all districts and see if district name is in results
-            districts = self.driver.find_element_by_id('bp-sbl-districts').text
+            try:
+                # get text of all districts and see if district name is in results
+                districts = self.driver.find_element_by_id('bp-sbl-districts').text
 
-            if self.district['name'] in districts:
-                self.results['in_results'].append([latitude, longitude])
-            else:
-                self.results['not_in_results'].append([latitude, longitude])
+                if self.district['name'] in districts:
+                    self.results['in_results'].append([latitude, longitude])
+                else:
+                    self.results['not_in_results'].append([latitude, longitude])
+            except Exception as e:
+                print(f'districts exception: {str(e)}')
 
-            # get text of all candidates: add to has_candidates if found; otherwise add to no_candidates
-            found_candidates = False
-            candidates_elements = self.driver.find_elements_by_css_selector('#bp-sbl-results-district-undefined > div.bp-sbl-results-district-title.bp-sbl-active.bp-sbl > h3')
-        
-            for x in candidates_elements:
-                if self.district['name'] in x.text:
-                    self.results['has_candidates'].append([latitude, longitude])
-                    found_candidates = True
-                    break
+            ### candidates
+            try:
+                # get text of all candidates: add to has_candidates if found; otherwise add to no_candidates
+                found_candidates = False
+                candidates_elements = self.driver.find_elements_by_xpath('//*[@id="bp-sbl-results-district-undefined"]/div[1]/h3')
             
-            # if no candidates found, add to no_candidates list
-            if found_candidates == False:
-                self.results['no_candidates'].append([latitude, longitude])
+                for x in candidates_elements:
+                    if self.district['name'] in x.text:
+                        self.results['has_candidates'].append([latitude, longitude])
+                        found_candidates = True
+                        break
+                
+                # if no candidates found, add to no_candidates list
+                if found_candidates == False:
+                    self.results['no_candidates'].append([latitude, longitude])
+            except Exception as e:
+                print(f'candidates exception: {str(e)}')
 
-            # get text of all district types (find_elements returns list of selenium elements)
-            district_types_elements = self.driver.find_elements_by_class_name('bp-sbl-district-type')
-            types_text = [x.text for x in district_types_elements]
+            ### district type duplicates
+            try:
+                # get text of all district types on page
+                district_types_elements = self.driver.find_elements_by_class_name('bp-sbl-district-type')
+                types_text = [x.text for x in district_types_elements]
 
-            # count how many of each district type there are (typically should only have one of each -> if more, add to results)
-            # key is type name, value is how many of that type
-            count_district_types = Counter(types_text)
+                # count how many of each district type there are (typically should only have one of each -> if more, add to results)
+                # key is type name, value is how many of that type
+                count_district_types = Counter(types_text)
 
-            for key, value in count_district_types.items():
-                if key != '' and value > 1:
-                    self.results['multiple_districts_of_same_type'].append(((latitude, longitude), key))
+                # ignore items with district name of empty string and items with count of 1
+                for key, value in count_district_types.items():
+                    if key != '' and value > 1:
+                        self.results['multiple_districts_of_same_type'].append(((latitude, longitude), key))
+            except Exception as e:
+                print(f'district type exception: {str(e)}')
 
             # save page URL to results
             self.results['links'].append(self.driver.current_url)
 
-        # occurs for explicit wait (election button); if it can't be found in 10 seconds -> stop current point's test
-        except TimeoutException:
-            print('Timed out')
-            self.results['errors'].append((latitude, longitude))
-
-        # occurs if implicit wait button can't be found -> stop current point's test
-        except NoSuchElementException:
-            print('Couldn\'t find element')
-            self.results['errors'].append((latitude, longitude))
-
-        # occurs if no election list, because there's only one upcoming election -> keep going with test
-        except ElementNotInteractableException:
-            pass
-
+        # catcn any other exception not in the nested try-except blocks above
+        except Exception as e:
+            print(f'outer try-except block exception: {str(e)}')
+    
+        # no matter what, close the driver
         finally:
             self.driver.quit()
 
