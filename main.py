@@ -59,3 +59,6 @@ def test():
     }
 
     return render_template("test.html", title="- Sample Ballot Testing - Results", results=results)
+
+if __name__ == '__main__':
+    app.run(debug = True)
