@@ -24,11 +24,7 @@ class SampleBallotThread (threading.Thread):
         self.results = results
         self.URL = 'https://ballotpedia.org/Sample_Ballot_Lookup'
 
-        exe_path = os.environ.get('CHROMEDRIVER_PATH')
-        if exe_path == None:
-            exe_path = './chromedriver.exe'
-            print('error with exe_path - using local') 
-            
+        exe_path = './chromedriver' 
         self.driver = webdriver.Chrome(executable_path=exe_path, options=driver_options)
         
 
